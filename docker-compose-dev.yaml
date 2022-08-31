@@ -25,7 +25,7 @@ services:
       - testing_net
     depends_on:
       - server
-  
+
   client2:
     container_name: client2
     image: client:latest
