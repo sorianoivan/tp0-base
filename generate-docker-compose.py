@@ -37,6 +37,18 @@ CLIENT_CONFIG = """  client{}:
 
 """
 
+SERVER_TEST_CONFIG = """  server-test:
+    container_name: server-test
+    build: ./server-test
+    image: server-test
+    entrypoint: python3 /test.py
+    networks:
+        - testing_net
+    depends_on:
+      - server
+
+"""
+
 NETWORK_CONFIG = """networks:
   testing_net:
     ipam:
@@ -52,6 +64,7 @@ def main(clients_amount):
     f.write(SERVER_CONFIG)
     for i in range(1,clients_amount + 1):
         f.write(CLIENT_CONFIG.format(i,i,i))
+    f.write(SERVER_TEST_CONFIG)
     f.write(NETWORK_CONFIG)
     f.close()
 

@@ -30,6 +30,16 @@ services:
     depends_on:
       - server
 
+  server-test:
+    container_name: server-test
+    build: ./server-test
+    image: server-test
+    entrypoint: python3 /test.py
+    networks:
+        - testing_net
+    depends_on:
+      - server
+
 networks:
   testing_net:
     ipam:
