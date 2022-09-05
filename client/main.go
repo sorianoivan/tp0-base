@@ -35,6 +35,11 @@ func InitConfig() (*viper.Viper, error) {
 	v.BindEnv("loop", "period")
 	v.BindEnv("loop", "lapse")
 	v.BindEnv("log", "level")
+	v.BindEnv(("firstname"))
+	v.BindEnv(("lastname"))
+	v.BindEnv(("document"))
+	v.BindEnv(("birthdate"))
+	//TODO: Add validation for the client info variables
 
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
@@ -79,6 +84,11 @@ func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Loop Lapse: %v", v.GetDuration("loop.lapse"))
 	logrus.Infof("Loop Period: %v", v.GetDuration("loop.period"))
 	logrus.Infof("Log Level: %s", v.GetString("log.level"))
+	logrus.Infof("Client First Name: %s", v.GetString("firstname"))
+	logrus.Infof("Client Last Name: %s", v.GetString("lastname"))
+	logrus.Infof("Client Document: %s", v.GetString("document"))
+	logrus.Infof("Client Birthdate: %s", v.GetString("birthdate"))
+
 }
 
 func main() {
@@ -94,6 +104,13 @@ func main() {
 	// Print program config with debugging purposes
 	PrintConfig(v)
 
+	person := common.Person{
+		FirstName: v.GetString("firstname"),
+		LastName:  v.GetString("lastName"),
+		Document:  v.GetString("document"),
+		Birthdate: v.GetString("birthdate"),
+	}
+
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
 		ID:            v.GetString("id"),
@@ -101,6 +118,6 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	client := common.NewClient(clientConfig)
+	client := common.NewClient(clientConfig, person)
 	client.StartClientLoop()
 }

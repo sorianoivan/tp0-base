@@ -12,6 +12,13 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type Person struct {
+	FirstName string
+	LastName  string
+	Document  string
+	Birthdate string
+}
+
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID            string
@@ -23,15 +30,17 @@ type ClientConfig struct {
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
+	person Person
 	conn   net.Conn
 	sigc   chan os.Signal //Channel to listen for OS signals like SIGTERM
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig) *Client {
+func NewClient(config ClientConfig, person Person) *Client {
 	client := &Client{
 		config: config,
+		person: person,
 		sigc:   make(chan os.Signal, 1),
 	}
 	signal.Notify(client.sigc, syscall.SIGTERM)

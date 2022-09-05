@@ -30,6 +30,10 @@ CLIENT_CONFIG = """  client{}:
       - CLI_SERVER_ADDRESS=server:12345
       - CLI_LOOP_LAPSE=1m2s
       - CLI_LOG_LEVEL=DEBUG
+      - CLI_FIRSTNAME=
+      - CLI_LASTNAME=
+      - CLI_DOCUMENT=
+      - CLI_BIRTHDATE=
     networks:
       - testing_net
     depends_on:
