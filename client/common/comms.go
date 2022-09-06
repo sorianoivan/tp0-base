@@ -24,11 +24,18 @@ func sendPersonInfo(person Person, conn *net.Conn) {
 	addToBuffer(buf, *conn, person.LastName)
 	addToBuffer(buf, *conn, person.Document)
 	addToBuffer(buf, *conn, person.Birthdate)
+
+	msgLen := new(bytes.Buffer)
+	err := binary.Write(msgLen, binary.LittleEndian, uint16(len(buf.Bytes()))) //Send 2 bytes with the total length of the msg
+	if err != nil {
+		panic("Failed to write data length to buffer")
+	}
+	sendAll(msgLen.Bytes(), conn)
 	sendAll(buf.Bytes(), conn)
 }
 
 func sendAll(data []byte, conn *net.Conn) {
-	log.Infof("Going to send %x from socket %v", data, (*conn).LocalAddr().String())
+	log.Infof("Going to send %v from socket %v", data, (*conn).LocalAddr().String())
 	bytesWritten := 0
 	for bytesWritten < len(data) {
 		n, err := (*conn).Write(data[bytesWritten:])
