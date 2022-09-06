@@ -65,6 +65,13 @@ func (c *Client) createClientSocket() error {
 func (c *Client) StartClientLoop() {
 	c.createClientSocket()
 	defer c.conn.Close()
+	go func() {
+		<-c.sigc
+		log.Infof("[CLIENT %v] SIGTERM received. Exiting gracefully", c.config.ID)
+		log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
+		c.conn.Close()
+		os.Exit(0)
+	}()
 
 	sendPersonInfo(c.person, &c.conn)
 	res := receiveServerResponse(&c.conn)
