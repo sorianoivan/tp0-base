@@ -3,6 +3,9 @@ import logging
 import signal
 import sys
 
+from common.utils import Contestant, is_winner
+from common.comms import receiveContestantInfo
+
 class Server:
     def __init__(self, port, listen_backlog):
         # Initialize server socket
@@ -23,7 +26,7 @@ class Server:
 
         while True:
             self._client_socket = self.__accept_new_connection()
-            self.__handle_client_connection(self._client_socket)
+            self.__handle_client_connection()
 
     def __sigterm_handler(self, *args):
             logging.info("SIGTERM received. Gracefully exiting")
@@ -37,23 +40,17 @@ class Server:
 
             sys.exit(0)
 
-    def __handle_client_connection(self, client_sock):
-        """
-        Read message from a specific client socket and closes the socket
-
-        If a problem arises in the communication with the client, the
-        client socket will also be closed
-        """
+    def __handle_client_connection(self):
         try:
-            msg = client_sock.recv(1024).rstrip().decode('utf-8')
-            logging.info(
-                'Message received from connection {}. Msg: {}'
-                .format(client_sock.getpeername(), msg))
-            client_sock.send("Your Message has been received: {}\n".format(msg).encode('utf-8'))
+            firstName, lastName, document, birthdate = receiveContestantInfo(self._client_socket)
+            contestant = Contestant(firstName, lastName, document, birthdate)
+            res = is_winner(contestant)
+            logging.info('{} {} is a Winner'.format(firstName, lastName) if res else '{} {} is not a Winner'.format(firstName, lastName))
+            self._client_socket.send(b'W' if res else b'L')
         except OSError:
-            logging.info("Error while reading socket {}".format(client_sock))
+            logging.info("Error while reading socket {}".format(self.client_sock))
         finally:
-            client_sock.close()
+            self._client_socket.close()
 
     def __accept_new_connection(self):
         """
