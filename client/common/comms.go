@@ -1,12 +1,21 @@
 package common
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/binary"
 	"net"
 
 	log "github.com/sirupsen/logrus"
 )
+
+func receiveServerResponse(conn *net.Conn) byte {
+	res, err := bufio.NewReader(*conn).ReadByte()
+	if err != nil {
+		panic("Error receiving response from server")
+	}
+	return res
+}
 
 func sendPersonInfo(person Person, conn *net.Conn) {
 	buf := new(bytes.Buffer)

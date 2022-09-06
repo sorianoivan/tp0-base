@@ -1,7 +1,6 @@
 package common
 
 import (
-	"bufio"
 	"net"
 	"os"
 	"os/signal"
@@ -65,19 +64,14 @@ func (c *Client) createClientSocket() error {
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
 	c.createClientSocket()
+	defer c.conn.Close()
 
 	sendPersonInfo(c.person, &c.conn)
-	msg, err := bufio.NewReader(c.conn).ReadString('\n')
-	if err != nil {
-		log.Errorf(
-			"[CLIENT %v] Error reading from socket. %v.",
-			c.config.ID,
-			err,
-		)
-		c.conn.Close()
-		return
+	res := receiveServerResponse(&c.conn)
+	if res == 'W' {
+		log.Infof("[CLIENT %v] %v %v is a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
+	} else {
+		log.Infof("[CLIENT %v] %v %v is not a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
 	}
-	log.Infof("[CLIENT %v] Message from server: %v", c.config.ID, msg)
 	log.Infof("[CLIENT %v] Closing connection", c.config.ID)
-	defer c.conn.Close()
 }
