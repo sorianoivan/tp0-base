@@ -1,4 +1,5 @@
 import logging
+from common.utils import Contestant
 
 def recvAll(clientSock, n):
     bytesRead = 0
@@ -16,18 +17,25 @@ def receiveContestantInfo(clientSock):
     logging.info("Total Msg Length: {}".format(msgLen))
     data = recvAll(clientSock, msgLen)
     logging.info("Data Received: {}".format(data))
-    bytesRead = 0
-    firstName, bytesRead = readFieldInfo(data, bytesRead)
-    lastName, bytesRead = readFieldInfo(data, bytesRead)
-    document, bytesRead = readFieldInfo(data, bytesRead)
-    birthdate, bytesRead = readFieldInfo(data, bytesRead)
 
-    return firstName, lastName, document, birthdate
+        
+    bytesRead = 0
+    contestants = []
+    while bytesRead < msgLen:
+        firstName, bytesRead = readFieldInfo(data, bytesRead)
+        lastName, bytesRead = readFieldInfo(data, bytesRead)
+        document, bytesRead = readFieldInfo(data, bytesRead)
+        birthdate, bytesRead = readFieldInfo(data, bytesRead)
+        #logging.info("Contestant: {}, {}, {}, {}".format(firstName, lastName, document, birthdate))
+        contestants.append(Contestant(firstName, lastName, document, birthdate))
+        
+
+    return contestants
 
 def readFieldInfo(data, bytesRead):
     fieldLen = data[bytesRead]
     bytesRead += 1
     fieldData = data[bytesRead:bytesRead + fieldLen].decode("utf-8")
     bytesRead += fieldLen
-    logging.info("fieldData: {}".format(fieldData))
+    #logging.info("fieldData: {}".format(fieldData))
     return fieldData, bytesRead

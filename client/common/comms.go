@@ -17,13 +17,31 @@ func receiveServerResponse(conn *net.Conn) byte {
 	return res
 }
 
+func sendContestantsInfo(contestantsList []Person, conn *net.Conn) {
+	buf := new(bytes.Buffer)
+	for _, contestant := range contestantsList {
+		addToBuffer(buf, contestant.FirstName)
+		addToBuffer(buf, contestant.LastName)
+		addToBuffer(buf, contestant.Document)
+		addToBuffer(buf, contestant.Birthdate)
+	}
+
+	msgLen := new(bytes.Buffer)
+	err := binary.Write(msgLen, binary.LittleEndian, uint16(len(buf.Bytes()))) //Send 2 bytes with the total length of the msg
+	if err != nil {
+		panic("Failed to write data length to buffer")
+	}
+	sendAll(msgLen.Bytes(), conn)
+	sendAll(buf.Bytes(), conn)
+}
+
 func sendPersonInfo(person Person, conn *net.Conn) {
 	buf := new(bytes.Buffer)
 
-	addToBuffer(buf, *conn, person.FirstName)
-	addToBuffer(buf, *conn, person.LastName)
-	addToBuffer(buf, *conn, person.Document)
-	addToBuffer(buf, *conn, person.Birthdate)
+	addToBuffer(buf, person.FirstName)
+	addToBuffer(buf, person.LastName)
+	addToBuffer(buf, person.Document)
+	addToBuffer(buf, person.Birthdate)
 
 	msgLen := new(bytes.Buffer)
 	err := binary.Write(msgLen, binary.LittleEndian, uint16(len(buf.Bytes()))) //Send 2 bytes with the total length of the msg
@@ -40,14 +58,14 @@ func sendAll(data []byte, conn *net.Conn) {
 	for bytesWritten < len(data) {
 		n, err := (*conn).Write(data[bytesWritten:])
 		if err != nil {
-			panic("Failed to write data length to buffer")
+			panic("Failed to send data to server")
 		}
 		bytesWritten += n
 		log.Infof("Sent %d bytes", n)
 	}
 }
 
-func addToBuffer(buf *bytes.Buffer, conn net.Conn, data string) {
+func addToBuffer(buf *bytes.Buffer, data string) {
 	err := binary.Write(buf, binary.LittleEndian, uint8(len(data)))
 	if err != nil {
 		panic("Failed to write data length to buffer")

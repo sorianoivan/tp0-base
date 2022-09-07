@@ -42,11 +42,13 @@ class Server:
 
     def __handle_client_connection(self):
         try:
-            firstName, lastName, document, birthdate = receiveContestantInfo(self._client_socket)
-            contestant = Contestant(firstName, lastName, document, birthdate)
-            res = is_winner(contestant)
-            logging.info('{} {} is a Winner'.format(firstName, lastName) if res else '{} {} is not a Winner'.format(firstName, lastName))
-            self._client_socket.send(b'W' if res else b'L')
+            contestants = receiveContestantInfo(self._client_socket)
+            for contestant in contestants:
+                logging.info("Contestant: {}, {}, {}, {}".format(contestant.first_name, contestant.last_name, contestant.document, contestant.birthdate))
+            winners = filter(is_winner, contestants)
+            for winner in winners:
+                logging.info("Winner: {}, {}, {}, {}".format(winner.first_name, winner.last_name, winner.document, winner.birthdate))
+            #Send winners to client
         except OSError:
             logging.info("Error while reading socket {}".format(self.client_sock))
         finally:

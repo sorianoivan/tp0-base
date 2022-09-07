@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/csv"
 	"net"
 	"os"
 	"os/signal"
@@ -73,12 +74,45 @@ func (c *Client) StartClientLoop() {
 		os.Exit(0)
 	}()
 
-	sendPersonInfo(c.person, &c.conn)
-	res := receiveServerResponse(&c.conn)
-	if res == 'W' {
-		log.Infof("[CLIENT %v] %v %v is a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
-	} else {
-		log.Infof("[CLIENT %v] %v %v is not a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
+	filepath := "./datasets/dataset-" + c.config.ID + ".csv"
+	log.Infof("Filepath: %v", filepath)
+	f, err := os.Open(filepath)
+	if err != nil {
+		log.Errorf("Unable to read input file %v: %v", filepath, err)
+		return
 	}
+	defer f.Close()
+
+	csvReader := csv.NewReader(f)
+	contestantsList := []Person{}
+	contestant, err := csvReader.Read()
+	if err != nil {
+		log.Errorf("Unable to parse file as CSV for %v: %v", filepath, err)
+		return
+	}
+	for contestant != nil {
+		p := Person{FirstName: contestant[0], LastName: contestant[1], Document: contestant[2], Birthdate: contestant[3]}
+		contestantsList = append(contestantsList, p)
+		if len(contestantsList) == 10 {
+			sendContestantsInfo(contestantsList, &c.conn)
+			time.Sleep(60 * time.Second)
+			contestantsList = []Person{}
+			c.conn.Close()
+			c.createClientSocket()
+		}
+		contestant, err = csvReader.Read()
+		if err != nil {
+			log.Errorf("Finished reading contestants")
+			break
+		}
+	}
+
+	//sendPersonInfo(c.person, &c.conn)
+	//res := receiveServerResponse(&c.conn)
+	// if res == 'W' {
+	// 	log.Infof("[CLIENT %v] %v %v is a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
+	// } else {
+	// 	log.Infof("[CLIENT %v] %v %v is not a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
+	// }
 	log.Infof("[CLIENT %v] Closing connection", c.config.ID)
 }
