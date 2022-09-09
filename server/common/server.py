@@ -4,11 +4,11 @@ import signal
 import sys
 import os
 
-from common.utils import is_winner
+from common.utils import is_winner, persist_winners
 from common.comms import receiveContestantsBatch, sendWinnersToClient
-from multiprocessing import Process, Queue, cpu_count
+from multiprocessing import Process, Queue, cpu_count, Lock
 
-def handle_client_connection(sockets_queue):
+def handle_client_connection(sockets_queue, file_lock):
         while True:
             logging.info("PID {} Waiting in queue for socket".format(os.getpid()))
             client_socket = sockets_queue.get()
@@ -21,7 +21,10 @@ def handle_client_connection(sockets_queue):
                     contestants = receiveContestantsBatch(client_socket)
                     if contestants == None:
                         break
-                    winners = filter(is_winner, contestants)
+                    winners = list(filter(is_winner, contestants))
+                    file_lock.acquire()
+                    persist_winners(winners)
+                    file_lock.release()
                     #Send winners to client
                     sendWinnersToClient(winners, client_socket)
             except OSError:
@@ -42,8 +45,9 @@ class Server:
 
 
     def run(self):
+        file_lock = Lock()
         for i in range(cpu_count()):
-            p = Process(target=handle_client_connection, args=(self._sockets_queue,))
+            p = Process(target=handle_client_connection, args=(self._sockets_queue, file_lock))
             p.start()
             logging.info("Created process with id {}".format(p.pid))
             self._handlers.append(p)
