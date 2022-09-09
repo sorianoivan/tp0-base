@@ -27,9 +27,15 @@ class Server:
     def __sigterm_handler(self, *args):
             logging.info("SIGTERM received. Gracefully exiting")
             logging.info("Closing server socket {}".format(self._server_socket))
+            self._server_socket.shutdown(socket.SHUT_RDWR)
             self._server_socket.close()
             logging.info("Closing client socket {}".format(self._client_socket))
             self._client_socket.close()
+            if (self._client_socket.fileno() != -1):
+                logging.info("Closing client socket {}".format(self._client_socket))
+                self._client_socket.shutdown(socket.SHUT_RDWR)
+                self._client_socket.close()
+
             sys.exit(0)
 
     def __handle_client_connection(self, client_sock):
