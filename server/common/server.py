@@ -2,9 +2,33 @@ import socket
 import logging
 import signal
 import sys
+import os
 
 from common.utils import is_winner
 from common.comms import receiveContestantsBatch, sendWinnersToClient
+from multiprocessing import Process, Queue, cpu_count
+
+def handle_client_connection(sockets_queue):
+        while True:
+            logging.info("PID {} Waiting in queue for socket".format(os.getpid()))
+            client_socket = sockets_queue.get()
+            if client_socket == None:
+                logging.info("PID {} received None in sockets queue. Finishing".format(os.getpid())) 
+                return
+            logging.info("PID {} Read socket from queue {}".format(os.getpid(), client_socket))
+            try:
+                while True:
+                    contestants = receiveContestantsBatch(client_socket)
+                    if contestants == None:
+                        break
+                    winners = filter(is_winner, contestants)
+                    #Send winners to client
+                    sendWinnersToClient(winners, client_socket)
+            except OSError:
+                logging.info("PID {} Error while reading socket {}".format(os.getpid(), client_socket))
+            finally:
+                logging.info("PID {} Closing client socket {}".format(os.getpid(), client_socket))
+                client_socket.close()
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -12,47 +36,38 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self._client_socket = None
+        self._sockets_queue = Queue()
+        self._handlers = []
         signal.signal(signal.SIGTERM, self.__sigterm_handler)
 
-    def run(self):
-        """
-        Dummy Server loop
 
-        Server that accept a new connections and establishes a
-        communication with a client. After client with communucation
-        finishes, servers starts to accept new connections again
-        """
+    def run(self):
+        for i in range(cpu_count()):
+            p = Process(target=handle_client_connection, args=(self._sockets_queue,))
+            p.start()
+            logging.info("Created process with id {}".format(p.pid))
+            self._handlers.append(p)
 
         while True:
-            self._client_socket = self.__accept_new_connection()
-            self.__handle_client_connection()
+            client_socket = self.__accept_new_connection()
+            logging.info("Put socket in queue {}".format(client_socket))
+            self._sockets_queue.put(client_socket)
 
     def __sigterm_handler(self, *args):
             logging.info("SIGTERM received. Gracefully exiting")
             logging.info("Closing server socket {}".format(self._server_socket))
             self._server_socket.shutdown(socket.SHUT_RDWR)
             self._server_socket.close()
-            if (self._client_socket.fileno() != -1):
-                logging.info("Closing client socket {}".format(self._client_socket))
-                self._client_socket.shutdown(socket.SHUT_RDWR)
-                self._client_socket.close()
+
+            logging.info("Sending None to the sockets_queue")
+            for i in range(len(self._handlers)):
+                self._sockets_queue.put(None)
+
+            for p in self._handlers:
+                logging.info("Joining process with pid {}".format(p.pid))
+                p.join()
 
             sys.exit(0)
-
-    def __handle_client_connection(self):
-        try:
-            while True:
-                contestants = receiveContestantsBatch(self._client_socket)
-                if contestants == None:
-                    break
-                winners = filter(is_winner, contestants)
-                #Send winners to client
-                sendWinnersToClient(winners, self._client_socket)
-        except OSError:
-            logging.info("Error while reading socket {}".format(self.client_sock))
-        finally:
-            self._client_socket.close()
 
     def __accept_new_connection(self):
         """
