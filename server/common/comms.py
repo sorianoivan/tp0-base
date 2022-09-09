@@ -11,6 +11,7 @@ def recvAll(clientSock, n):
         bytesRead += len(received)
 
     if msg == b'\n\n':
+        logging.info("Received finish message from {}".format(clientSock.getpeername()))
         return None
     return msg
 

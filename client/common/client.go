@@ -106,7 +106,7 @@ func (c *Client) StartClientLoop() {
 			break
 		}
 	}
-	//Send final msg to server
+	log.Infof("Sending finish message to server")
 	msgLen := new(bytes.Buffer)
 	err = msgLen.WriteByte('\n')
 	if err != nil {
