@@ -30,19 +30,29 @@ services:
       - CLI_LASTNAME=Soriano
       - CLI_DOCUMENT=41824203
       - CLI_BIRTHDATE=1999-04-11
-
     networks:
       - testing_net
     depends_on:
       - server
 
-  server-test:
-    container_name: server-test
-    build: ./server-test
-    image: server-test
-    entrypoint: python3 /test.py
+  client2:
+    container_name: client2
+    image: client:latest
+    volumes:
+      - ./client/config.yaml:/config.yaml
+      - ./.data/datasets:/datasets
+    entrypoint: /client
+    environment:
+      - CLI_ID=2
+      - CLI_SERVER_ADDRESS=server:12345
+      - CLI_LOOP_LAPSE=1m2s
+      - CLI_LOG_LEVEL=DEBUG
+      - CLI_FIRSTNAME=Miranda
+      - CLI_LASTNAME=Soriano
+      - CLI_DOCUMENT=42824203
+      - CLI_BIRTHDATE=2001-02-06
     networks:
-        - testing_net
+      - testing_net
     depends_on:
       - server
 

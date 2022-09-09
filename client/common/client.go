@@ -1,6 +1,7 @@
 package common
 
 import (
+	"bytes"
 	"encoding/csv"
 	"net"
 	"os"
@@ -29,17 +30,15 @@ type ClientConfig struct {
 // Client Entity that encapsulates how
 type Client struct {
 	config ClientConfig
-	person Person
 	conn   net.Conn
 	sigc   chan os.Signal //Channel to listen for OS signals like SIGTERM
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig, person Person) *Client {
+func NewClient(config ClientConfig) *Client {
 	client := &Client{
 		config: config,
-		person: person,
 		sigc:   make(chan os.Signal, 1),
 	}
 	signal.Notify(client.sigc, syscall.SIGTERM)
@@ -59,6 +58,7 @@ func (c *Client) createClientSocket() error {
 		)
 	}
 	c.conn = conn
+	log.Infof("[CLIENT %v] Connected to server with socket %v", c.config.ID, c.conn.LocalAddr().String())
 	return nil
 }
 
@@ -75,7 +75,6 @@ func (c *Client) StartClientLoop() {
 	}()
 
 	filepath := "./datasets/dataset-" + c.config.ID + ".csv"
-	log.Infof("Filepath: %v", filepath)
 	f, err := os.Open(filepath)
 	if err != nil {
 		log.Errorf("Unable to read input file %v: %v", filepath, err)
@@ -90,15 +89,16 @@ func (c *Client) StartClientLoop() {
 		log.Errorf("Unable to parse file as CSV for %v: %v", filepath, err)
 		return
 	}
+	totalContestants := 0
+	totalWinners := 0
 	for contestant != nil {
 		p := Person{FirstName: contestant[0], LastName: contestant[1], Document: contestant[2], Birthdate: contestant[3]}
+		totalContestants += 1
 		contestantsList = append(contestantsList, p)
-		if len(contestantsList) == 10 {
+		if len(contestantsList) == 100 {
 			sendContestantsInfo(contestantsList, &c.conn)
-			time.Sleep(60 * time.Second)
 			contestantsList = []Person{}
-			c.conn.Close()
-			c.createClientSocket()
+			totalWinners += receiveServerResponse(&c.conn)
 		}
 		contestant, err = csvReader.Read()
 		if err != nil {
@@ -106,13 +106,20 @@ func (c *Client) StartClientLoop() {
 			break
 		}
 	}
+	//Send final msg to server
+	msgLen := new(bytes.Buffer)
+	err = msgLen.WriteByte('\n')
+	if err != nil {
+		panic("Failed to write data length to buffer")
+	}
+	err = msgLen.WriteByte('\n')
+	if err != nil {
+		panic("Failed to write data length to buffer")
+	}
+	sendAll(msgLen.Bytes(), &c.conn)
 
-	//sendPersonInfo(c.person, &c.conn)
-	//res := receiveServerResponse(&c.conn)
-	// if res == 'W' {
-	// 	log.Infof("[CLIENT %v] %v %v is a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
-	// } else {
-	// 	log.Infof("[CLIENT %v] %v %v is not a lottery winner", c.config.ID, c.person.FirstName, c.person.LastName)
-	// }
+	log.Infof("[CLIENT %v] JUGADORES TOTALES: %v", c.config.ID, totalContestants)
+	log.Infof("[CLIENT %v] GANADORES TOTALES: %v", c.config.ID, totalWinners)
+	c.conn.Close()
 	log.Infof("[CLIENT %v] Closing connection", c.config.ID)
 }

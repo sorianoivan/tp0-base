@@ -3,8 +3,8 @@ import logging
 import signal
 import sys
 
-from common.utils import Contestant, is_winner
-from common.comms import receiveContestantInfo
+from common.utils import is_winner
+from common.comms import receiveContestantsBatch, sendWinnersToClient
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -42,13 +42,13 @@ class Server:
 
     def __handle_client_connection(self):
         try:
-            contestants = receiveContestantInfo(self._client_socket)
-            for contestant in contestants:
-                logging.info("Contestant: {}, {}, {}, {}".format(contestant.first_name, contestant.last_name, contestant.document, contestant.birthdate))
-            winners = filter(is_winner, contestants)
-            for winner in winners:
-                logging.info("Winner: {}, {}, {}, {}".format(winner.first_name, winner.last_name, winner.document, winner.birthdate))
-            #Send winners to client
+            while True:
+                contestants = receiveContestantsBatch(self._client_socket)
+                if contestants == None:
+                    break
+                winners = filter(is_winner, contestants)
+                #Send winners to client
+                sendWinnersToClient(winners, self._client_socket)
         except OSError:
             logging.info("Error while reading socket {}".format(self.client_sock))
         finally:

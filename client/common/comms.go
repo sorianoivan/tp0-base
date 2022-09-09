@@ -1,20 +1,60 @@
 package common
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/binary"
+	"io"
 	"net"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func receiveServerResponse(conn *net.Conn) byte {
-	res, err := bufio.NewReader(*conn).ReadByte()
+func receiveServerResponse(conn *net.Conn) int {
+	log.Infof("Waiting for server response")
+	msgLen := make([]byte, 2)
+	_, err := io.ReadFull(*conn, msgLen)
+	if err != nil {
+		panic("Error receiving response length from server")
+	}
+	length := binary.LittleEndian.Uint16(msgLen)
+
+	msg := make([]byte, length)
+	io.ReadFull(*conn, msg)
 	if err != nil {
 		panic("Error receiving response from server")
 	}
-	return res
+	log.Infof("Received response from server. %v bytes", msgLen)
+	winners := processMessage(msg)
+	return winners
+}
+
+func processMessage(msg []byte) int {
+	winners := 0
+	bytesRead := 0
+	for bytesRead < len(msg) {
+		firstNameLenght := int(msg[bytesRead])
+		bytesRead += 1
+		firstName := msg[bytesRead : bytesRead+firstNameLenght]
+		bytesRead += firstNameLenght
+
+		lastNameLenght := int(msg[bytesRead])
+		bytesRead += 1
+		lastName := msg[bytesRead : bytesRead+lastNameLenght]
+		bytesRead += lastNameLenght
+
+		docLenght := int(msg[bytesRead])
+		bytesRead += 1
+		document := msg[bytesRead : bytesRead+docLenght]
+		bytesRead += docLenght
+
+		birthdateLength := int(msg[bytesRead])
+		bytesRead += 1
+		birthdate := msg[bytesRead : bytesRead+birthdateLength]
+		bytesRead += birthdateLength
+		winners += 1
+		log.Infof("Winner: %v, %v, %v, %v", string(firstName), string(lastName), string(document), string(birthdate))
+	}
+	return winners
 }
 
 func sendContestantsInfo(contestantsList []Person, conn *net.Conn) {
@@ -26,6 +66,8 @@ func sendContestantsInfo(contestantsList []Person, conn *net.Conn) {
 		addToBuffer(buf, contestant.Birthdate)
 	}
 
+	log.Infof("Sending batch to server")
+
 	msgLen := new(bytes.Buffer)
 	err := binary.Write(msgLen, binary.LittleEndian, uint16(len(buf.Bytes()))) //Send 2 bytes with the total length of the msg
 	if err != nil {
@@ -33,6 +75,7 @@ func sendContestantsInfo(contestantsList []Person, conn *net.Conn) {
 	}
 	sendAll(msgLen.Bytes(), conn)
 	sendAll(buf.Bytes(), conn)
+	log.Infof("Sent batch to server. %v bytes", msgLen)
 }
 
 func sendPersonInfo(person Person, conn *net.Conn) {
@@ -53,7 +96,6 @@ func sendPersonInfo(person Person, conn *net.Conn) {
 }
 
 func sendAll(data []byte, conn *net.Conn) {
-	log.Infof("Going to send %v from socket %v", data, (*conn).LocalAddr().String())
 	bytesWritten := 0
 	for bytesWritten < len(data) {
 		n, err := (*conn).Write(data[bytesWritten:])
@@ -61,7 +103,6 @@ func sendAll(data []byte, conn *net.Conn) {
 			panic("Failed to send data to server")
 		}
 		bytesWritten += n
-		log.Infof("Sent %d bytes", n)
 	}
 }
 

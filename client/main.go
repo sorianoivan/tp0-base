@@ -3,9 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -32,14 +30,6 @@ func InitConfig() (*viper.Viper, error) {
 	// Add env variables supported
 	v.BindEnv("id")
 	v.BindEnv("server", "address")
-	v.BindEnv("loop", "period")
-	v.BindEnv("loop", "lapse")
-	v.BindEnv("log", "level")
-	v.BindEnv(("firstname"))
-	v.BindEnv(("lastname"))
-	v.BindEnv(("document"))
-	v.BindEnv(("birthdate"))
-	//TODO: Add validation for the client info variables
 
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
@@ -51,13 +41,13 @@ func InitConfig() (*viper.Viper, error) {
 	}
 
 	// Parse time.Duration variables and return an error if those variables cannot be parsed
-	if _, err := time.ParseDuration(v.GetString("loop.lapse")); err != nil {
-		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_LAPSE env var as time.Duration.")
-	}
+	// if _, err := time.ParseDuration(v.GetString("loop.lapse")); err != nil {
+	// 	return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_LAPSE env var as time.Duration.")
+	// }
 
-	if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
-		return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
-	}
+	// if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
+	// 	return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
+	// }
 
 	return v, nil
 }
@@ -81,13 +71,6 @@ func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Client configuration")
 	logrus.Infof("Client ID: %s", v.GetString("id"))
 	logrus.Infof("Server Address: %s", v.GetString("server.address"))
-	logrus.Infof("Loop Lapse: %v", v.GetDuration("loop.lapse"))
-	logrus.Infof("Loop Period: %v", v.GetDuration("loop.period"))
-	logrus.Infof("Log Level: %s", v.GetString("log.level"))
-	logrus.Infof("Client First Name: %s", v.GetString("firstname"))
-	logrus.Infof("Client Last Name: %s", v.GetString("lastname"))
-	logrus.Infof("Client Document: %s", v.GetString("document"))
-	logrus.Infof("Client Birthdate: %s", v.GetString("birthdate"))
 
 }
 
@@ -104,13 +87,6 @@ func main() {
 	// Print program config with debugging purposes
 	PrintConfig(v)
 
-	person := common.Person{
-		FirstName: v.GetString("firstname"),
-		LastName:  v.GetString("lastName"),
-		Document:  v.GetString("document"),
-		Birthdate: v.GetString("birthdate"),
-	}
-
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
 		ID:            v.GetString("id"),
@@ -118,6 +94,6 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	client := common.NewClient(clientConfig, person)
+	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
 }
