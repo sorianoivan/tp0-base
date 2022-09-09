@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"fmt"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -21,6 +24,7 @@ type ClientConfig struct {
 type Client struct {
 	config ClientConfig
 	conn   net.Conn
+	sigc   chan os.Signal //Channel to listen for OS signals like SIGTERM
 }
 
 // NewClient Initializes a new client receiving the configuration
@@ -28,7 +32,9 @@ type Client struct {
 func NewClient(config ClientConfig) *Client {
 	client := &Client{
 		config: config,
+		sigc:   make(chan os.Signal, 1),
 	}
+	signal.Notify(client.sigc, syscall.SIGTERM)
 	return client
 }
 
@@ -61,6 +67,12 @@ loop:
 		select {
 		case <-timeout:
 			break loop
+		case <-c.sigc:
+			log.Infof("[CLIENT %v] SIGTERM received. Gracefully exiting", c.config.ID)
+			log.Infof("[CLIENT %v] Closing client socket: %v", c.config.ID, c.conn.LocalAddr().String())
+			close(c.sigc)
+			c.conn.Close()
+			os.Exit(0)
 		default:
 		}
 
