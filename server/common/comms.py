@@ -3,7 +3,6 @@ import logging
 from common.utils import Contestant
 
 def recvAll(clientSock, n):
-    logging.info("n: {}".format(n))
     bytesRead = 0
     msg = b''
     while bytesRead < n:
@@ -17,7 +16,7 @@ def recvAll(clientSock, n):
 
 
 def receiveContestantsBatch(clientSock):
-    logging.info("Waiting for batch from {}".format(clientSock))
+    logging.info("Waiting for batch from {}".format(clientSock.getpeername()))
     msg = recvAll(clientSock, 2) #Receive 2 bytes with the length of the message
     if msg == None:
         return None
@@ -44,7 +43,7 @@ def readFieldInfo(data, bytesRead):
     return fieldData, bytesRead
 
 def sendWinnersToClient(winners, clientSock):
-    logging.info("Sending winners to client {}".format(clientSock))
+    logging.info("Sending winners to client {}".format(clientSock.getpeername()))
     msg = bytearray()
     for winner in winners:
         msg.append(len(winner.first_name.encode('utf-8')))
@@ -58,7 +57,6 @@ def sendWinnersToClient(winners, clientSock):
         msg.extend(birthdate.encode('utf-8'))
 
     clientSock.sendall(len(msg).to_bytes(2, 'little'))
-    logging.info("WINNERS VEING SENT. {}".format(msg))
     clientSock.sendall(msg)  
     logging.info("Sent winners to client. {} bytes".format(len(msg)))
 

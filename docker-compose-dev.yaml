@@ -24,12 +24,6 @@ services:
     environment:
       - CLI_ID=1
       - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
-      - CLI_LOG_LEVEL=DEBUG
-      - CLI_FIRSTNAME=Ivan
-      - CLI_LASTNAME=Soriano
-      - CLI_DOCUMENT=41824203
-      - CLI_BIRTHDATE=1999-04-11
     networks:
       - testing_net
     depends_on:
@@ -45,12 +39,6 @@ services:
     environment:
       - CLI_ID=2
       - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
-      - CLI_LOG_LEVEL=DEBUG
-      - CLI_FIRSTNAME=Miranda
-      - CLI_LASTNAME=Soriano
-      - CLI_DOCUMENT=42824203
-      - CLI_BIRTHDATE=2001-02-06
     networks:
       - testing_net
     depends_on:

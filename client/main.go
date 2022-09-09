@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -40,15 +43,6 @@ func InitConfig() (*viper.Viper, error) {
 		fmt.Printf("Configuration could not be read from config file. Using env variables instead")
 	}
 
-	// Parse time.Duration variables and return an error if those variables cannot be parsed
-	// if _, err := time.ParseDuration(v.GetString("loop.lapse")); err != nil {
-	// 	return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_LAPSE env var as time.Duration.")
-	// }
-
-	// if _, err := time.ParseDuration(v.GetString("loop.period")); err != nil {
-	// 	return nil, errors.Wrapf(err, "Could not parse CLI_LOOP_PERIOD env var as time.Duration.")
-	// }
-
 	return v, nil
 }
 
@@ -74,6 +68,12 @@ func PrintConfig(v *viper.Viper) {
 
 }
 
+func listenForOsSignals(sigs chan os.Signal, finished chan bool, id string) {
+	<-sigs
+	log.Infof("[CLIENT %v] SIGTERM received. Exiting gracefully", id)
+	finished <- true
+}
+
 func main() {
 	v, err := InitConfig()
 	if err != nil {
@@ -87,13 +87,17 @@ func main() {
 	// Print program config with debugging purposes
 	PrintConfig(v)
 
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
+	finished := make(chan bool, 1)
+
+	go listenForOsSignals(sigs, finished, v.GetString("id"))
+
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
 		ID:            v.GetString("id"),
-		LoopLapse:     v.GetDuration("loop.lapse"),
-		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	client := common.NewClient(clientConfig)
+	client := common.NewClient(clientConfig, sigs, finished)
 	client.StartClientLoop()
 }

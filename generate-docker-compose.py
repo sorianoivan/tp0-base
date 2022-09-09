@@ -24,30 +24,13 @@ CLIENT_CONFIG = """  client{}:
     image: client:latest
     volumes:
       - ./client/config.yaml:/config.yaml
+      - ./.data/datasets:/datasets
     entrypoint: /client
     environment:
       - CLI_ID={}
       - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
-      - CLI_LOG_LEVEL=DEBUG
-      - CLI_FIRSTNAME=
-      - CLI_LASTNAME=
-      - CLI_DOCUMENT=
-      - CLI_BIRTHDATE=
     networks:
       - testing_net
-    depends_on:
-      - server
-
-"""
-
-SERVER_TEST_CONFIG = """  server-test:
-    container_name: server-test
-    build: ./server-test
-    image: server-test
-    entrypoint: python3 /test.py
-    networks:
-        - testing_net
     depends_on:
       - server
 
@@ -68,7 +51,6 @@ def main(clients_amount):
     f.write(SERVER_CONFIG)
     for i in range(1,clients_amount + 1):
         f.write(CLIENT_CONFIG.format(i,i,i))
-    f.write(SERVER_TEST_CONFIG)
     f.write(NETWORK_CONFIG)
     f.close()
 

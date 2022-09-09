@@ -5,8 +5,6 @@ import (
 	"encoding/csv"
 	"net"
 	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -23,25 +21,24 @@ type Person struct {
 type ClientConfig struct {
 	ID            string
 	ServerAddress string
-	LoopLapse     time.Duration
-	LoopPeriod    time.Duration
 }
 
 // Client Entity that encapsulates how
 type Client struct {
-	config ClientConfig
-	conn   net.Conn
-	sigc   chan os.Signal //Channel to listen for OS signals like SIGTERM
+	config   ClientConfig
+	conn     net.Conn
+	sigs     chan os.Signal //Channel to listen for OS signals like SIGTERM
+	finished chan bool
 }
 
 // NewClient Initializes a new client receiving the configuration
 // as a parameter
-func NewClient(config ClientConfig) *Client {
+func NewClient(config ClientConfig, sigs chan os.Signal, finished chan bool) *Client {
 	client := &Client{
-		config: config,
-		sigc:   make(chan os.Signal, 1),
+		config:   config,
+		sigs:     sigs,
+		finished: finished,
 	}
-	signal.Notify(client.sigc, syscall.SIGTERM)
 	return client
 }
 
@@ -64,15 +61,9 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
+	time.Sleep(5 * time.Second) //Wait a few seconds so the server is up and listening for connections
 	c.createClientSocket()
 	defer c.conn.Close()
-	go func() {
-		<-c.sigc
-		log.Infof("[CLIENT %v] SIGTERM received. Exiting gracefully", c.config.ID)
-		log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
-		c.conn.Close()
-		os.Exit(0)
-	}()
 
 	filepath := "./datasets/dataset-" + c.config.ID + ".csv"
 	f, err := os.Open(filepath)
@@ -92,6 +83,15 @@ func (c *Client) StartClientLoop() {
 	totalContestants := 0
 	totalWinners := 0
 	for contestant != nil {
+		select {
+		case <-c.finished:
+			log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
+			c.conn.Close()
+			log.Infof("[CLIENT %v] Closing file %v", c.config.ID, filepath)
+			f.Close()
+			return
+		default:
+		}
 		p := Person{FirstName: contestant[0], LastName: contestant[1], Document: contestant[2], Birthdate: contestant[3]}
 		totalContestants += 1
 		contestantsList = append(contestantsList, p)
@@ -118,8 +118,11 @@ func (c *Client) StartClientLoop() {
 	}
 	sendAll(msgLen.Bytes(), &c.conn)
 
-	log.Infof("[CLIENT %v] JUGADORES TOTALES: %v", c.config.ID, totalContestants)
-	log.Infof("[CLIENT %v] GANADORES TOTALES: %v", c.config.ID, totalWinners)
+	log.Infof("[CLIENT %v] Total contestants: %v", c.config.ID, totalContestants)
+	log.Infof("[CLIENT %v] Total winners: %v", c.config.ID, totalWinners)
+	log.Infof("[CLIENT %v] Winners percentage: %v", c.config.ID, 100*float32(totalWinners)/float32(totalContestants))
+	log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
 	c.conn.Close()
-	log.Infof("[CLIENT %v] Closing connection", c.config.ID)
+	log.Infof("[CLIENT %v] Closing channel listening for OS signals", c.config.ID)
+	close(c.sigs)
 }
