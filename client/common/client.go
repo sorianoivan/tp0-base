@@ -1,11 +1,10 @@
 package common
 
 import (
-	"bytes"
-	"encoding/binary"
 	"encoding/csv"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -20,8 +19,11 @@ type Person struct {
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
+	ID            int
 	ServerAddress string
+	QueryWaitTime int
+	InitWaitTime  int
+	TotalFiles    int
 }
 
 // Client Entity that encapsulates how
@@ -60,13 +62,19 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop() {
-	time.Sleep(5 * time.Second) //Wait a few seconds so the server is up and listening for connections
-	c.createClientSocket()
-	defer c.conn.Close()
+func (c *Client) checkForOsSingal() bool {
+	select {
+	case <-c.finished:
+		return true
+	default:
+		return false
+	}
+}
 
-	filepath := "./datasets/dataset-" + c.config.ID + ".csv"
+func (c *Client) StartClientLoop() {
+	time.Sleep(time.Duration(c.config.InitWaitTime) * time.Second) //Wait a few seconds so the server is up and listening for connections
+
+	filepath := "./datasets/dataset-" + strconv.Itoa((c.config.ID%c.config.TotalFiles)+1) + ".csv"
 	f, err := os.Open(filepath)
 	if err != nil {
 		log.Errorf("Unable to read input file %v: %v", filepath, err)
@@ -74,6 +82,7 @@ func (c *Client) StartClientLoop() {
 	}
 	defer f.Close()
 
+	log.Infof("[CLIENT %v] Reading contestants from %v", c.config.ID, filepath)
 	csvReader := csv.NewReader(f)
 	contestantsList := []Person{}
 	contestant, err := csvReader.Read()
@@ -81,17 +90,16 @@ func (c *Client) StartClientLoop() {
 		log.Errorf("Unable to parse file as CSV for %v: %v", filepath, err)
 		return
 	}
+
+	c.createClientSocket()
+	defer c.conn.Close()
+
 	totalContestants := 0
 	totalWinners := 0
 	for contestant != nil {
-		select {
-		case <-c.finished:
-			log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
-			c.conn.Close()
-			log.Infof("[CLIENT %v] Closing file %v", c.config.ID, filepath)
-			f.Close()
+		if c.checkForOsSingal() {
+			c.closeClientResources(f)
 			return
-		default:
 		}
 		p := Person{FirstName: contestant[0], LastName: contestant[1], Document: contestant[2], Birthdate: contestant[3]}
 		totalContestants += 1
@@ -99,14 +107,24 @@ func (c *Client) StartClientLoop() {
 		if len(contestantsList) == 100 {
 			sendContestantsInfo(contestantsList, &c.conn)
 			contestantsList = []Person{}
-			totalWinners += receiveServerResponse(&c.conn)
+			winnersInBatch, err := receiveServerResponse(&c.conn)
+			if err != nil {
+				sendStopedProcessingToServer(c)
+				sendFinishedToServer(c)
+			}
+			totalWinners += winnersInBatch
 		}
 		contestant, err = csvReader.Read()
 		if err != nil {
 			log.Infof("Finished reading contestants. Sending last batch of contestants")
 			sendContestantsInfo(contestantsList, &c.conn)
 			contestantsList = []Person{}
-			totalWinners += receiveServerResponse(&c.conn)
+			winnersInBatch, err := receiveServerResponse(&c.conn)
+			if err != nil {
+				sendStopedProcessingToServer(c)
+				sendFinishedToServer(c)
+			}
+			totalWinners += winnersInBatch
 			break
 		}
 	}
@@ -115,60 +133,33 @@ func (c *Client) StartClientLoop() {
 	log.Infof("[CLIENT %v] Total winners: %v", c.config.ID, totalWinners)
 	log.Infof("[CLIENT %v] Winners percentage: %v", c.config.ID, 100*float32(totalWinners)/float32(totalContestants))
 
-	//Send message of finished processing
-	log.Infof("Sending finished processing message to server")
-	msg := new(bytes.Buffer)
-	err = msg.WriteByte('\f')
-	if err != nil {
-		panic("Failed to write byte to buffer")
+	if c.checkForOsSingal() {
+		c.closeClientResources(f)
+		return
 	}
-	err = msg.WriteByte('\f')
-	if err != nil {
-		panic("Failed to write byte to buffer")
-	}
-	sendAll(msg.Bytes(), &c.conn)
+	sendStopedProcessingToServer(c)
 
-	//Send winners request to server. TODO: meter esto en funcion
-	for {
-		log.Infof("Sending query message to server")
-		msg := new(bytes.Buffer)
-		err = msg.WriteByte('?')
-		if err != nil {
-			panic("Failed to write byte to buffer")
-		}
-		err = msg.WriteByte('?')
-		if err != nil {
-			panic("Failed to write byte to buffer")
-		}
-		sendAll(msg.Bytes(), &c.conn)
-		msgType, msgValue := receiveQueryResponse(&c.conn)
-		if msgType[0] == 'P' {
-			activeAgencies := binary.LittleEndian.Uint16(msgValue)
-			log.Infof("There are %v agencies still processing", activeAgencies)
-			log.Infof("Going to sleep")
-			time.Sleep(15 * time.Second) //TODO: Meter el tiempo en una env variable o config
-		} else if msgType[0] == 'W' {
-			totalWinners := binary.LittleEndian.Uint16(msgValue)
-			log.Infof("There are %v total winners", totalWinners)
-			break //Ver si esto sale del for
-		}
+	err = requestTotalWinners(c)
+	if err != nil {
+		log.Infof("[CLIENT %v] SIGTERM IN requestotalwinners: %v", c.config.ID, err)
+		c.closeClientResources(f)
+		return
 	}
 
-	//TODO: Meter esto en una funcion tipo finish() y meter el send de los bytes en una funcion de comms
-	log.Infof("Sending finish message to server")
-	msgLen := new(bytes.Buffer)
-	err = msgLen.WriteByte('\n')
-	if err != nil {
-		panic("Failed to write byte to buffer")
+	if c.checkForOsSingal() {
+		c.closeClientResources(f)
+		return
 	}
-	err = msgLen.WriteByte('\n')
-	if err != nil {
-		panic("Failed to write byte to buffer")
-	}
-	sendAll(msgLen.Bytes(), &c.conn)
+	sendFinishedToServer(c)
+	c.closeClientResources(f)
+}
 
+func (c *Client) closeClientResources(f *os.File) {
 	log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
 	c.conn.Close()
+	log.Infof("[CLIENT %v] Closing file", c.config.ID)
+	f.Close()
 	log.Infof("[CLIENT %v] Closing channel listening for OS signals", c.config.ID)
 	close(c.sigs)
+	close(c.finished)
 }

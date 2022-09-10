@@ -37,7 +37,6 @@ class Server:
             client_socket = self.__accept_new_connection()
             logging.info("Put socket in queue {}".format(client_socket))
             self._sockets_queue.put(client_socket)
-            self._tracking_input.put('S')#Add 1 active agency
 
     def __sigterm_handler(self, *args):
             logging.info("SIGTERM received. Gracefully exiting")

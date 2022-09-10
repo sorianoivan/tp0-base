@@ -3,54 +3,129 @@ package common
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"io"
 	"net"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
 
-func receiveQueryResponse(conn *net.Conn) ([]byte, []byte) {
+func sendStopedProcessingToServer(c *Client) error {
+	//Send message of finished processing
+	log.Infof("Sending finished processing message to server")
+	msg := new(bytes.Buffer)
+	err := msg.WriteByte('\f')
+	if err != nil {
+		return err
+	}
+	err = msg.WriteByte('\f')
+	if err != nil {
+		return err
+	}
+	err = sendAll(msg.Bytes(), &c.conn)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func sendFinishedToServer(c *Client) error {
+	log.Infof("Sending finish message to server")
+	msgLen := new(bytes.Buffer)
+	err := msgLen.WriteByte('\n')
+	if err != nil {
+		return err
+	}
+	err = msgLen.WriteByte('\n')
+	if err != nil {
+		return err
+	}
+	err = sendAll(msgLen.Bytes(), &c.conn)
+	if err != nil {
+		return err
+	}
+
+	// log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
+	// c.conn.Close()
+	// log.Infof("[CLIENT %v] Closing channel listening for OS signals", c.config.ID)
+	// close(c.sigs)
+	// close(c.finished)
+	return nil
+}
+
+func requestTotalWinners(c *Client) error {
+	for {
+		if c.checkForOsSingal() {
+			return errors.New("Received SIGTERM while waiting for total winners")
+		}
+		log.Infof("Sending query message to server")
+		msg := new(bytes.Buffer)
+		err := msg.WriteByte('?')
+		if err != nil {
+			return err
+		}
+		err = msg.WriteByte('?')
+		if err != nil {
+			return err
+		}
+		err = sendAll(msg.Bytes(), &c.conn)
+		if err != nil {
+			return err
+		}
+		msgType, msgValue, err := receiveQueryResponse(&c.conn)
+		if err != nil {
+			return err
+		}
+		if msgType[0] == 'P' {
+			activeAgencies := binary.LittleEndian.Uint16(msgValue)
+			log.Infof("There are %v agencies still processing", activeAgencies)
+			log.Infof("Going to sleep")
+			time.Sleep(time.Duration(time.Duration(c.config.QueryWaitTime).Seconds()))
+		} else if msgType[0] == 'W' {
+			totalWinners := binary.LittleEndian.Uint16(msgValue)
+			log.Infof("There are %v total winners", totalWinners)
+			break
+		}
+	}
+	return nil
+}
+
+func receiveQueryResponse(conn *net.Conn) ([]byte, []byte, error) {
 	log.Infof("Waiting for server response to query")
 	msgType := make([]byte, 1)
 	_, err := io.ReadFull(*conn, msgType)
 	if err != nil {
-		panic("Error receiving response length from server")
+		return nil, nil, err
 	}
 	log.Infof("Query response type: %v", msgType)
 
 	msg := make([]byte, 2)
 	io.ReadFull(*conn, msg)
 	if err != nil {
-		panic("Error receiving response from server")
+		return nil, nil, err
 	}
 	log.Infof("Query Result. %v", msg)
-	// log.Infof("Waiting for server response to query")
-	// msg := make([]byte, 3)
-	// _, err := io.ReadFull(*conn, msg)
-	// if err != nil {
-	// 	panic("Error receiving response length from server")
-	// }
-	// log.Infof("Query response: %v", msg)
-	return msgType, msg
+	return msgType, msg, nil
 }
 
-func receiveServerResponse(conn *net.Conn) int {
+func receiveServerResponse(conn *net.Conn) (int, error) {
 	log.Infof("Waiting for server response")
 	msgLen := make([]byte, 2)
 	_, err := io.ReadFull(*conn, msgLen)
 	if err != nil {
-		panic("Error receiving response length from server")
+		return -1, nil
 	}
 	length := binary.LittleEndian.Uint16(msgLen)
 
 	msg := make([]byte, length)
 	io.ReadFull(*conn, msg)
 	if err != nil {
-		panic("Error receiving response from server")
+		return -1, nil
 	}
 	log.Infof("Received response from server. %v bytes", msgLen)
 	winners := processMessage(msg)
-	return winners
+	return winners, nil
 }
 
 func processMessage(msg []byte) int {
@@ -82,13 +157,25 @@ func processMessage(msg []byte) int {
 	return winners
 }
 
-func sendContestantsInfo(contestantsList []Person, conn *net.Conn) {
+func sendContestantsInfo(contestantsList []Person, conn *net.Conn) error {
 	buf := new(bytes.Buffer)
 	for _, contestant := range contestantsList {
-		addToBuffer(buf, contestant.FirstName)
-		addToBuffer(buf, contestant.LastName)
-		addToBuffer(buf, contestant.Document)
-		addToBuffer(buf, contestant.Birthdate)
+		err := addToBuffer(buf, contestant.FirstName)
+		if err != nil {
+			return err
+		}
+		err = addToBuffer(buf, contestant.LastName)
+		if err != nil {
+			return err
+		}
+		err = addToBuffer(buf, contestant.Document)
+		if err != nil {
+			return err
+		}
+		err = addToBuffer(buf, contestant.Birthdate)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Infof("Sending batch to server")
@@ -96,48 +183,40 @@ func sendContestantsInfo(contestantsList []Person, conn *net.Conn) {
 	msgLen := new(bytes.Buffer)
 	err := binary.Write(msgLen, binary.LittleEndian, uint16(len(buf.Bytes()))) //Send 2 bytes with the total length of the msg
 	if err != nil {
-		panic("Failed to write data length to buffer")
+		return err
 	}
-	sendAll(msgLen.Bytes(), conn)
-	sendAll(buf.Bytes(), conn)
-	log.Infof("Sent batch to server. %v bytes", msgLen)
-}
-
-func sendPersonInfo(person Person, conn *net.Conn) {
-	buf := new(bytes.Buffer)
-
-	addToBuffer(buf, person.FirstName)
-	addToBuffer(buf, person.LastName)
-	addToBuffer(buf, person.Document)
-	addToBuffer(buf, person.Birthdate)
-
-	msgLen := new(bytes.Buffer)
-	err := binary.Write(msgLen, binary.LittleEndian, uint16(len(buf.Bytes()))) //Send 2 bytes with the total length of the msg
+	err = sendAll(msgLen.Bytes(), conn)
 	if err != nil {
-		panic("Failed to write data length to buffer")
+		return err
 	}
-	sendAll(msgLen.Bytes(), conn)
-	sendAll(buf.Bytes(), conn)
+	err = sendAll(buf.Bytes(), conn)
+	if err != nil {
+		return err
+	}
+	log.Infof("Sent batch to server. %v bytes", msgLen)
+	return nil
 }
 
-func sendAll(data []byte, conn *net.Conn) {
+func sendAll(data []byte, conn *net.Conn) error {
 	bytesWritten := 0
 	for bytesWritten < len(data) {
 		n, err := (*conn).Write(data[bytesWritten:])
 		if err != nil {
-			panic("Failed to send data to server")
+			return err
 		}
 		bytesWritten += n
 	}
+	return nil
 }
 
-func addToBuffer(buf *bytes.Buffer, data string) {
+func addToBuffer(buf *bytes.Buffer, data string) error {
 	err := binary.Write(buf, binary.LittleEndian, uint8(len(data)))
 	if err != nil {
-		panic("Failed to write data length to buffer")
+		return err
 	}
 	n, _ := buf.WriteString(data)
 	if n < len(data) {
-		panic("Failed to write data to buffer")
+		return err
 	}
+	return nil
 }

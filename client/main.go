@@ -33,6 +33,9 @@ func InitConfig() (*viper.Viper, error) {
 	// Add env variables supported
 	v.BindEnv("id")
 	v.BindEnv("server", "address")
+	v.BindEnv("initWaitTime")
+	v.BindEnv("queryWaitTime")
+	v.BindEnv("totalFiles")
 
 	// Try to read configuration from config file. If config file
 	// does not exists then ReadInConfig will fail but configuration
@@ -63,9 +66,11 @@ func InitLogger(logLevel string) error {
 // For debugging purposes only
 func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Client configuration")
-	logrus.Infof("Client ID: %s", v.GetString("id"))
+	logrus.Infof("Client ID: %s", v.GetInt("id"))
 	logrus.Infof("Server Address: %s", v.GetString("server.address"))
-
+	logrus.Infof("Query Wait Time: %v", v.GetInt("queryWaitTime"))
+	logrus.Infof("Query Wait Time: %v", v.GetInt("initWaitTime"))
+	logrus.Infof("Total Files: %v", v.GetInt("totalFiles"))
 }
 
 func listenForOsSignals(sigs chan os.Signal, finished chan bool, id string) {
@@ -95,7 +100,10 @@ func main() {
 
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
+		ID:            v.GetInt("id"),
+		QueryWaitTime: v.GetInt("QueryWaitTime"),
+		InitWaitTime:  v.GetInt("initWaitTime"),
+		TotalFiles:    v.GetInt("totalFiles"),
 	}
 
 	client := common.NewClient(clientConfig, sigs, finished)

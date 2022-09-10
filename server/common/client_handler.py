@@ -5,9 +5,9 @@ from common.comms import receiveContestantsBatch, sendTrackerInfo, sendWinnersTo
 from common.utils import is_winner, persist_winners
 
 
-def request_total_winners(client_socket, tracking_input, tracking_output):
+def request_total_winners(tracking_input, tracking_output):
     logging.info("PID {} Sending ? to Tracker process".format(os.getpid()))
-    tracking_input.put('?')#Mando consulta
+    tracking_input.put('?')
     res = tracking_output.get()
     logging.info("PID {} Received from Tracker process {}".format(os.getpid(), res))
     return res
@@ -20,6 +20,7 @@ def handle_client_connection(sockets_queue, file_lock, tracking_input, tracking_
                 logging.info("PID {} received None in sockets queue. Finishing".format(os.getpid())) 
                 return
             logging.info("PID {} Read socket from queue {}".format(os.getpid(), client_socket))
+            tracking_input.put('S')
             try:
                 while True:
                     logging.info("PID {} Waiting for batch".format(os.getpid()))
@@ -29,11 +30,11 @@ def handle_client_connection(sockets_queue, file_lock, tracking_input, tracking_
                         break
                     elif contestants == b'\f\f':
                         logging.info("PID {} Sending F to Tracker process".format(os.getpid()))
-                        tracking_input.put('F')#Digo que termine de procesar
+                        tracking_input.put('F')
                         continue
                     elif contestants == b'??':
                         logging.info("PID {} Received query request message from {}".format(os.getpid(), client_socket.getpeername()))
-                        info = request_total_winners(client_socket, tracking_input, tracking_output)
+                        info = request_total_winners(tracking_input, tracking_output)
                         sendTrackerInfo(client_socket, info)
                         continue
 
@@ -52,5 +53,3 @@ def handle_client_connection(sockets_queue, file_lock, tracking_input, tracking_
             finally:
                 logging.info("PID {} Closing client socket {}".format(os.getpid(), client_socket))
                 client_socket.close()
-                # logging.info("PID {} Sending F to Tracker process".format(os.getpid()))
-                # tracking_input.put('F')#Digo que termine de procesar

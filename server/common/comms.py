@@ -2,6 +2,8 @@ import os
 import logging
 from common.utils import Contestant
 
+special_connection_msgs = [b'\n\n', b'\f\f', b'??']
+
 def recvAll(client_sock, n):
     bytesRead = 0
     msg = b''
@@ -18,7 +20,7 @@ def recvAll(client_sock, n):
 def receiveContestantsBatch(client_sock):
     logging.info("PID {} Waiting for batch from {}".format(os.getpid(), client_sock.getpeername()))
     msg = recvAll(client_sock, 2)
-    if msg == b'\n\n' or msg == b'\f\f' or msg == b'??':#TODO: Meter estos valores en una lista o algo if msg in list
+    if msg in special_connection_msgs:
         return msg
     
     msgLen = int.from_bytes(msg, "little")
