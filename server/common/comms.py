@@ -1,4 +1,4 @@
-import datetime
+import os
 import logging
 from common.utils import Contestant
 
@@ -7,23 +7,26 @@ def recvAll(clientSock, n):
     msg = b''
     while bytesRead < n:
         received = clientSock.recv(n - bytesRead)
+        if len(received) == 0:
+            raise Exception("Received 0 bytes from server") 
         msg += received
         bytesRead += len(received)
 
     if msg == b'\n\n':
-        logging.info("Received finish message from {}".format(clientSock.getpeername()))
+        logging.info("PID {} Received finish message from {}".format(os.getpid(), clientSock.getpeername()))
         return None
+
     return msg
 
 
 def receiveContestantsBatch(clientSock):
-    logging.info("Waiting for batch from {}".format(clientSock.getpeername()))
+    logging.info("PID {} Waiting for batch from {}".format(os.getpid(), clientSock.getpeername()))
     msg = recvAll(clientSock, 2) #Receive 2 bytes with the length of the message
     if msg == None:
         return None
     msgLen = int.from_bytes(msg, "little")
     data = recvAll(clientSock, msgLen)
-    logging.info("Batch Received From client. {} bytes".format(msgLen))
+    logging.info("PID {} Batch Received From client. {} bytes".format(os.getpid(), msgLen))
     
     bytesRead = 0
     contestants = []
@@ -44,7 +47,7 @@ def readFieldInfo(data, bytesRead):
     return fieldData, bytesRead
 
 def sendWinnersToClient(winners, clientSock):
-    logging.info("Sending winners to client {}".format(clientSock.getpeername()))
+    logging.info("PID {} Sending winners to client {}".format(os.getpid(), clientSock.getpeername()))
     msg = bytearray()
     for winner in winners:
         msg.append(len(winner.first_name.encode('utf-8')))
@@ -59,5 +62,5 @@ def sendWinnersToClient(winners, clientSock):
 
     clientSock.sendall(len(msg).to_bytes(2, 'little'))
     clientSock.sendall(msg)  
-    logging.info("Sent winners to client. {} bytes".format(len(msg)))
+    logging.info("PID {} Sent winners to client. {} bytes".format(os.getpid(), len(msg)))
 

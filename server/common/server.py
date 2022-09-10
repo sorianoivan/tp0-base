@@ -18,17 +18,20 @@ def handle_client_connection(sockets_queue, file_lock):
             logging.info("PID {} Read socket from queue {}".format(os.getpid(), client_socket))
             try:
                 while True:
+                    logging.info("PID {} Waiting for batch".format(os.getpid()))
                     contestants = receiveContestantsBatch(client_socket)
                     if contestants == None:
                         break
                     winners = list(filter(is_winner, contestants))
+                    logging.info("PID {} Persisting winners".format(os.getpid()))
                     file_lock.acquire()
                     persist_winners(winners)
                     file_lock.release()
                     #Send winners to client
+                    logging.info("PID {} Sending winners to client".format(os.getpid()))
                     sendWinnersToClient(winners, client_socket)
-            except OSError:
-                logging.info("PID {} Error while reading socket {}".format(os.getpid(), client_socket))
+            except Exception as e:
+                logging.info("PID {} Error while handling client connection: {}".format(os.getpid(), e))
             finally:
                 logging.info("PID {} Closing client socket {}".format(os.getpid(), client_socket))
                 client_socket.close()
