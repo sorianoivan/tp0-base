@@ -2,6 +2,7 @@ package common
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/csv"
 	"net"
 	"os"
@@ -102,25 +103,70 @@ func (c *Client) StartClientLoop() {
 		}
 		contestant, err = csvReader.Read()
 		if err != nil {
-			log.Errorf("Finished reading contestants")
+			log.Infof("Finished reading contestants. Sending last batch of contestants")
+			sendContestantsInfo(contestantsList, &c.conn)
+			contestantsList = []Person{}
+			totalWinners += receiveServerResponse(&c.conn)
 			break
 		}
 	}
-	log.Infof("Sending finish message to server")
-	msgLen := new(bytes.Buffer)
-	err = msgLen.WriteByte('\n')
-	if err != nil {
-		panic("Failed to write data length to buffer")
-	}
-	err = msgLen.WriteByte('\n')
-	if err != nil {
-		panic("Failed to write data length to buffer")
-	}
-	sendAll(msgLen.Bytes(), &c.conn)
 
 	log.Infof("[CLIENT %v] Total contestants: %v", c.config.ID, totalContestants)
 	log.Infof("[CLIENT %v] Total winners: %v", c.config.ID, totalWinners)
 	log.Infof("[CLIENT %v] Winners percentage: %v", c.config.ID, 100*float32(totalWinners)/float32(totalContestants))
+
+	//Send message of finished processing
+	log.Infof("Sending finished processing message to server")
+	msg := new(bytes.Buffer)
+	err = msg.WriteByte('\f')
+	if err != nil {
+		panic("Failed to write byte to buffer")
+	}
+	err = msg.WriteByte('\f')
+	if err != nil {
+		panic("Failed to write byte to buffer")
+	}
+	sendAll(msg.Bytes(), &c.conn)
+
+	//Send winners request to server. TODO: meter esto en funcion
+	for {
+		log.Infof("Sending query message to server")
+		msg := new(bytes.Buffer)
+		err = msg.WriteByte('?')
+		if err != nil {
+			panic("Failed to write byte to buffer")
+		}
+		err = msg.WriteByte('?')
+		if err != nil {
+			panic("Failed to write byte to buffer")
+		}
+		sendAll(msg.Bytes(), &c.conn)
+		msgType, msgValue := receiveQueryResponse(&c.conn)
+		if msgType[0] == 'P' {
+			activeAgencies := binary.LittleEndian.Uint16(msgValue)
+			log.Infof("There are %v agencies still processing", activeAgencies)
+			log.Infof("Going to sleep")
+			time.Sleep(15 * time.Second) //TODO: Meter el tiempo en una env variable o config
+		} else if msgType[0] == 'W' {
+			totalWinners := binary.LittleEndian.Uint16(msgValue)
+			log.Infof("There are %v total winners", totalWinners)
+			break //Ver si esto sale del for
+		}
+	}
+
+	//TODO: Meter esto en una funcion tipo finish() y meter el send de los bytes en una funcion de comms
+	log.Infof("Sending finish message to server")
+	msgLen := new(bytes.Buffer)
+	err = msgLen.WriteByte('\n')
+	if err != nil {
+		panic("Failed to write byte to buffer")
+	}
+	err = msgLen.WriteByte('\n')
+	if err != nil {
+		panic("Failed to write byte to buffer")
+	}
+	sendAll(msgLen.Bytes(), &c.conn)
+
 	log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
 	c.conn.Close()
 	log.Infof("[CLIENT %v] Closing channel listening for OS signals", c.config.ID)

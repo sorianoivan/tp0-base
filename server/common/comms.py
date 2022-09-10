@@ -2,30 +2,27 @@ import os
 import logging
 from common.utils import Contestant
 
-def recvAll(clientSock, n):
+def recvAll(client_sock, n):
     bytesRead = 0
     msg = b''
     while bytesRead < n:
-        received = clientSock.recv(n - bytesRead)
+        received = client_sock.recv(n - bytesRead)
         if len(received) == 0:
             raise Exception("Received 0 bytes from server") 
         msg += received
         bytesRead += len(received)
 
-    if msg == b'\n\n':
-        logging.info("PID {} Received finish message from {}".format(os.getpid(), clientSock.getpeername()))
-        return None
-
     return msg
 
 
-def receiveContestantsBatch(clientSock):
-    logging.info("PID {} Waiting for batch from {}".format(os.getpid(), clientSock.getpeername()))
-    msg = recvAll(clientSock, 2) #Receive 2 bytes with the length of the message
-    if msg == None:
-        return None
+def receiveContestantsBatch(client_sock):
+    logging.info("PID {} Waiting for batch from {}".format(os.getpid(), client_sock.getpeername()))
+    msg = recvAll(client_sock, 2)
+    if msg == b'\n\n' or msg == b'\f\f' or msg == b'??':#TODO: Meter estos valores en una lista o algo if msg in list
+        return msg
+    
     msgLen = int.from_bytes(msg, "little")
-    data = recvAll(clientSock, msgLen)
+    data = recvAll(client_sock, msgLen)
     logging.info("PID {} Batch Received From client. {} bytes".format(os.getpid(), msgLen))
     
     bytesRead = 0
@@ -39,15 +36,15 @@ def receiveContestantsBatch(clientSock):
 
     return contestants
 
-def readFieldInfo(data, bytesRead):
-    fieldLen = data[bytesRead]
-    bytesRead += 1
-    fieldData = data[bytesRead:bytesRead + fieldLen].decode("utf-8")
-    bytesRead += fieldLen
-    return fieldData, bytesRead
+def readFieldInfo(data, bytes_read):
+    field_len = data[bytes_read]
+    bytes_read += 1
+    field_data = data[bytes_read:bytes_read + field_len].decode("utf-8")
+    bytes_read += field_len
+    return field_data, bytes_read
 
-def sendWinnersToClient(winners, clientSock):
-    logging.info("PID {} Sending winners to client {}".format(os.getpid(), clientSock.getpeername()))
+def sendWinnersToClient(winners, client_sock):
+    logging.info("PID {} Sending winners to client {}".format(os.getpid(), client_sock.getpeername()))
     msg = bytearray()
     for winner in winners:
         msg.append(len(winner.first_name.encode('utf-8')))
@@ -60,7 +57,11 @@ def sendWinnersToClient(winners, clientSock):
         msg.append(len(birthdate))
         msg.extend(birthdate.encode('utf-8'))
 
-    clientSock.sendall(len(msg).to_bytes(2, 'little'))
-    clientSock.sendall(msg)  
+    client_sock.sendall(len(msg).to_bytes(2, 'little'))
+    client_sock.sendall(msg)  
     logging.info("PID {} Sent winners to client. {} bytes".format(os.getpid(), len(msg)))
 
+def sendTrackerInfo(client_sock, info):
+    client_sock.sendall(info['type'].encode('utf-8'))
+    client_sock.sendall(info['value'].to_bytes(2, 'little'))
+    logging.info("PID {} Sent Tracker info to client.".format(os.getpid()))

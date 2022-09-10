@@ -9,6 +9,31 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func receiveQueryResponse(conn *net.Conn) ([]byte, []byte) {
+	log.Infof("Waiting for server response to query")
+	msgType := make([]byte, 1)
+	_, err := io.ReadFull(*conn, msgType)
+	if err != nil {
+		panic("Error receiving response length from server")
+	}
+	log.Infof("Query response type: %v", msgType)
+
+	msg := make([]byte, 2)
+	io.ReadFull(*conn, msg)
+	if err != nil {
+		panic("Error receiving response from server")
+	}
+	log.Infof("Query Result. %v", msg)
+	// log.Infof("Waiting for server response to query")
+	// msg := make([]byte, 3)
+	// _, err := io.ReadFull(*conn, msg)
+	// if err != nil {
+	// 	panic("Error receiving response length from server")
+	// }
+	// log.Infof("Query response: %v", msg)
+	return msgType, msg
+}
+
 func receiveServerResponse(conn *net.Conn) int {
 	log.Infof("Waiting for server response")
 	msgLen := make([]byte, 2)
