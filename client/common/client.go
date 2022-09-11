@@ -21,8 +21,7 @@ type Person struct {
 type ClientConfig struct {
 	ID            string
 	ServerAddress string
-	LoopLapse     time.Duration
-	LoopPeriod    time.Duration
+	InitWaitTime  int
 }
 
 // Client Entity that encapsulates how
@@ -63,6 +62,7 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
+	time.Sleep(time.Duration(c.config.InitWaitTime) * time.Second) //Wait a few seconds so the server is up and listening for connections
 	c.createClientSocket()
 	defer c.conn.Close()
 	go func() {

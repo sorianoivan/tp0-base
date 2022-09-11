@@ -23,7 +23,7 @@ services:
     environment:
       - CLI_ID=1
       - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
+      - CLI_INITWAITTIME=5
       - CLI_LOG_LEVEL=DEBUG
       - CLI_FIRSTNAME=Ivan
       - CLI_LASTNAME=Soriano
@@ -32,16 +32,6 @@ services:
 
     networks:
       - testing_net
-    depends_on:
-      - server
-
-  server-test:
-    container_name: server-test
-    build: ./server-test
-    image: server-test
-    entrypoint: python3 /test.py
-    networks:
-        - testing_net
     depends_on:
       - server
 

@@ -28,7 +28,7 @@ CLIENT_CONFIG = """  client{}:
     environment:
       - CLI_ID={}
       - CLI_SERVER_ADDRESS=server:12345
-      - CLI_LOOP_LAPSE=1m2s
+      - CLI_INITWAITTIME=5
       - CLI_LOG_LEVEL=DEBUG
       - CLI_FIRSTNAME=
       - CLI_LASTNAME=
@@ -36,18 +36,6 @@ CLIENT_CONFIG = """  client{}:
       - CLI_BIRTHDATE=
     networks:
       - testing_net
-    depends_on:
-      - server
-
-"""
-
-SERVER_TEST_CONFIG = """  server-test:
-    container_name: server-test
-    build: ./server-test
-    image: server-test
-    entrypoint: python3 /test.py
-    networks:
-        - testing_net
     depends_on:
       - server
 
@@ -68,7 +56,6 @@ def main(clients_amount):
     f.write(SERVER_CONFIG)
     for i in range(1,clients_amount + 1):
         f.write(CLIENT_CONFIG.format(i,i,i))
-    f.write(SERVER_TEST_CONFIG)
     f.write(NETWORK_CONFIG)
     f.close()
 
