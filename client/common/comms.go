@@ -45,12 +45,6 @@ func sendFinishedToServer(c *Client) error {
 	if err != nil {
 		return err
 	}
-
-	// log.Infof("[CLIENT %v] Closing socket %v", c.config.ID, c.conn.LocalAddr().String())
-	// c.conn.Close()
-	// log.Infof("[CLIENT %v] Closing channel listening for OS signals", c.config.ID)
-	// close(c.sigs)
-	// close(c.finished)
 	return nil
 }
 
@@ -80,7 +74,7 @@ func requestTotalWinners(c *Client) error {
 		if msgType[0] == 'P' {
 			activeAgencies := binary.LittleEndian.Uint16(msgValue)
 			log.Infof("There are %v agencies still processing", activeAgencies)
-			log.Infof("Going to sleep")
+			log.Infof("Waiting before making the query again")
 			time.Sleep(time.Duration(time.Duration(c.config.QueryWaitTime).Seconds()))
 		} else if msgType[0] == 'W' {
 			totalWinners := binary.LittleEndian.Uint16(msgValue)
@@ -98,14 +92,12 @@ func receiveQueryResponse(conn *net.Conn) ([]byte, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("Query response type: %v", msgType)
 
 	msg := make([]byte, 2)
 	io.ReadFull(*conn, msg)
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("Query Result. %v", msg)
 	return msgType, msg, nil
 }
 

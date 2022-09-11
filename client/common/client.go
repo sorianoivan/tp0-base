@@ -116,7 +116,7 @@ func (c *Client) StartClientLoop() {
 		}
 		contestant, err = csvReader.Read()
 		if err != nil {
-			log.Infof("Finished reading contestants. Sending last batch of contestants")
+			log.Infof("[CLIENT %v] Finished reading contestants. Sending last batch of contestants", c.config.ID)
 			sendContestantsInfo(contestantsList, &c.conn)
 			contestantsList = []Person{}
 			winnersInBatch, err := receiveServerResponse(&c.conn)
@@ -141,7 +141,6 @@ func (c *Client) StartClientLoop() {
 
 	err = requestTotalWinners(c)
 	if err != nil {
-		log.Infof("[CLIENT %v] SIGTERM IN requestotalwinners: %v", c.config.ID, err)
 		c.closeClientResources(f)
 		return
 	}

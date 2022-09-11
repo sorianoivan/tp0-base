@@ -1,6 +1,7 @@
 import logging
 
-def track_winners(tracking_input, tracking_output):
+def track_winners(tracking_input, tracking_output, server_socket):
+    server_socket.close()
     active_agencies = 0
     total_winners = 0
     while True:

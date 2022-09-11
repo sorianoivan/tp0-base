@@ -14,21 +14,22 @@ class Server:
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
-        self._sockets_queue = Queue()
         self._tracker_handler = None
+        self._sockets_queue = Queue()
         self._tracking_input = Queue()
+        self._tracking_output = Queue()
         self._handlers = []
         signal.signal(signal.SIGTERM, self.__sigterm_handler)
 
 
     def run(self):
-        tracking_output = Queue()
-        self._tracker_handler = Process(target=track_winners, args=(self._tracking_input, tracking_output))
+        #tracking_output = Queue()
+        self._tracker_handler = Process(target=track_winners, args=(self._tracking_input, self._tracking_output, self._server_socket))
         self._tracker_handler.start()
 
         file_lock = Lock()
         for i in range(cpu_count()):
-            p = Process(target=handle_client_connection, args=(self._sockets_queue, file_lock, self._tracking_input, tracking_output))
+            p = Process(target=handle_client_connection, args=(self._sockets_queue, self._server_socket, file_lock, self._tracking_input, self._tracking_output))
             p.start()
             logging.info("Created process with id {}".format(p.pid))
             self._handlers.append(p)
@@ -56,6 +57,14 @@ class Server:
             self._tracking_input.put(None)
             logging.info("Joining tracker process")
             self._tracker_handler.join()
+
+            logging.info("Closing and joining queues")
+            self._sockets_queue.close()
+            self._sockets_queue.join_thread()
+            self._tracking_input.close()
+            self._tracking_input.join_thread()
+            self._tracking_output.close()
+            self._tracking_output.join_thread()
 
             sys.exit(0)
 
