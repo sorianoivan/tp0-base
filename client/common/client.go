@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"net"
 	"os"
+	"strconv"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -19,8 +20,10 @@ type Person struct {
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
-	ID            string
+	ID            int
 	ServerAddress string
+	InitWaitTime  int
+	TotalFiles    int
 }
 
 // Client Entity that encapsulates how
@@ -61,11 +64,9 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-	time.Sleep(5 * time.Second) //Wait a few seconds so the server is up and listening for connections
-	c.createClientSocket()
-	defer c.conn.Close()
+	time.Sleep(time.Duration(c.config.InitWaitTime) * time.Second) //Wait a few seconds so the server is up and listening for connections
 
-	filepath := "./datasets/dataset-" + c.config.ID + ".csv"
+	filepath := "./datasets/dataset-" + strconv.Itoa((c.config.ID%c.config.TotalFiles)+1) + ".csv"
 	f, err := os.Open(filepath)
 	if err != nil {
 		log.Errorf("Unable to read input file %v: %v", filepath, err)
@@ -80,6 +81,10 @@ func (c *Client) StartClientLoop() {
 		log.Errorf("Unable to parse file as CSV for %v: %v", filepath, err)
 		return
 	}
+
+	c.createClientSocket()
+	defer c.conn.Close()
+
 	totalContestants := 0
 	totalWinners := 0
 	for contestant != nil {

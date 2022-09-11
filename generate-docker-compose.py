@@ -29,6 +29,8 @@ CLIENT_CONFIG = """  client{}:
     environment:
       - CLI_ID={}
       - CLI_SERVER_ADDRESS=server:12345
+      - CLI_INITWAITTIME=5
+      - CLI_TOTALFILES=5
     networks:
       - testing_net
     depends_on:

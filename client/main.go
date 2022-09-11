@@ -32,6 +32,7 @@ func InitConfig() (*viper.Viper, error) {
 
 	// Add env variables supported
 	v.BindEnv("id")
+	v.BindEnv("initWaitTime")
 	v.BindEnv("server", "address")
 
 	// Try to read configuration from config file. If config file
@@ -63,7 +64,9 @@ func InitLogger(logLevel string) error {
 // For debugging purposes only
 func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Client configuration")
-	logrus.Infof("Client ID: %s", v.GetString("id"))
+	logrus.Infof("Client ID: %s", v.GetInt("id"))
+	logrus.Infof("Init Wait Time: %s", v.GetInt("initWaitTime"))
+	logrus.Infof("Total Files: %s", v.GetInt("totalFiles"))
 	logrus.Infof("Server Address: %s", v.GetString("server.address"))
 
 }
@@ -95,7 +98,9 @@ func main() {
 
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
+		ID:            v.GetInt("id"),
+		InitWaitTime:  v.GetInt("initWaitTime"),
+		TotalFiles:    v.GetInt("totalFiles"),
 	}
 
 	client := common.NewClient(clientConfig, sigs, finished)
