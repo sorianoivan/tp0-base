@@ -108,6 +108,8 @@ func (c *Client) StartClientLoop() {
 		contestant, err = csvReader.Read()
 		if err != nil {
 			log.Errorf("Finished reading contestants")
+			sendContestantsInfo(contestantsList, &c.conn)
+			totalWinners += receiveServerResponse(&c.conn)
 			break
 		}
 	}
