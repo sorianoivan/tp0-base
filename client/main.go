@@ -63,7 +63,7 @@ func InitLogger(logLevel string) error {
 // For debugging purposes only
 func PrintConfig(v *viper.Viper) {
 	logrus.Infof("Client configuration")
-	logrus.Infof("Client ID: %s", v.GetString("id"))
+	logrus.Infof("Client ID: %v", v.GetInt("id"))
 	logrus.Infof("Server Address: %s", v.GetString("server.address"))
 
 }
@@ -95,7 +95,7 @@ func main() {
 
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
+		ID:            v.GetInt("id"),
 	}
 
 	client := common.NewClient(clientConfig, sigs, finished)
