@@ -17,6 +17,18 @@ Los targets disponibles son:
 * **docker-image**: Buildea las imágenes a ser utilizadas tanto en el client como el server. Este target es utilizado por **docker-compose-up**, por lo cual se lo puede utilizar para testear nuevos cambios en las imágenes antes de arrancar el proyecto.
 * **build**: Compila la aplicación cliente en el host en lugar de Docker. La compilación de esta forma es mucho más rápida pero requiere tener el entorno de Golang instalado en la máquina.
 
+Para probar un ejercicio se debe ir a la branch correspondiente y utilizar los targets del Makefile indicados anteriormente. 
+Ademas, desde el ejercicio 6 en adelante, es necesario ir a la carpeta .data y descomprimir el archivo datasets.zip a una carpeta llamada datasets en ese mismo directorio.
+
+A partir del ejercicio 2 se dispone de un script para poder generar el archivo docker-compose con n clientes. La forma de uso es 
+
+
+    python3 generate-docker-compose n 
+
+siendo n la cantidad de clientes que se quiere. Si se usa este comando en el ejercicio 5 es necesario completar las variables de entorno de cada cliente con datos del jugador por el cual se quiere consultar
+
+
+
 ### Servidor
 El servidor del presente ejemplo es un EchoServer: los mensajes recibidos por el cliente son devueltos inmediatamente. El servidor actual funciona de la siguiente forma:
 1. Servidor acepta una nueva conexión.
